@@ -3,7 +3,7 @@ const axios = require("axios");
 const cheerio = require("cheerio");
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 const DRY_JULY_URL = "https://www.dryjuly.com/users/ashtin-james";
 const TARGET = 150000;
@@ -25,51 +25,70 @@ function moneyToNumber(value) {
 
 async function updateDryJulyData() {
   try {
-    const { data } = await axios.get(DRY_JULY_URL, {
-      headers: { "User-Agent": "Mozilla/5.0" }
+
+    const response = await axios.get(DRY_JULY_URL, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+        "Accept":
+          "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-AU,en;q=0.9",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        "Referer": "https://www.google.com/"
+      },
+      timeout: 10000
     });
 
-    const $ = cheerio.load(data);
+    const $ = cheerio.load(response.data);
+
+    const bodyText = $("body").text().replace(/\s+/g, " ");
 
     const name = $("h1").first().text().trim() || "Ashtin James";
 
-    const raisedText = $("h4")
-      .filter((i, el) => $(el).text().trim().toLowerCase() === "raised")
-      .next("h3")
-      .text()
-      .trim();
+    const moneyMatches = bodyText.match(/\$[\d,]+(?:\.\d{2})?/g) || [];
 
-    const raised = raisedText ? moneyToNumber(raisedText) : 0;
-    const target = TARGET;
-    const percent = (raised / target) * 100;
+    let raised = 0;
+
+    if (moneyMatches.length > 0) {
+      raised = moneyToNumber(moneyMatches[0]);
+    }
+
+    const percent = (raised / TARGET) * 100;
 
     const donations = [];
 
-    $("h2").each((i, el) => {
-      const text = $(el).text().trim().replace(/\s+/g, " ");
-      const match = text.match(/\$([\d,]+(?:\.\d{2})?)\s+from\s+(.+)/i);
+    const donationRegex =
+      /\$([\d,]+(?:\.\d{2})?)\s+from\s+(.+?)(?=\s+\$[\d,]+(?:\.\d{2})?\s+from|$)/gi;
 
-      if (match) {
-        donations.push({
-          amount: "$" + match[1],
-          name: match[2].trim()
-        });
-      }
-    });
+    let match;
+
+    while ((match = donationRegex.exec(bodyText)) !== null) {
+      donations.push({
+        amount: "$" + match[1],
+        name: match[2].trim()
+      });
+    }
 
     latestData = {
       name,
       raised,
-      target,
+      target: TARGET,
       percent,
       donations: donations.slice(0, 3),
       updated: new Date().toLocaleTimeString()
     };
 
-    console.log(`Updated Dry July: $${raised} / $${target}`);
-    console.log("Last 3 donors:", latestData.donations);
+    console.log("==================================");
+    console.log("Raised:", raised);
+    console.log("Target:", TARGET);
+    console.log("Percent:", percent.toFixed(2));
+    console.log("Donations:", donations.slice(0, 3));
+    console.log("==================================");
+
   } catch (err) {
-    console.log("Could not update Dry July data:", err.message);
+    console.log("Could not update Dry July data:");
+    console.log(err.response?.status || err.message);
   }
 }
 
@@ -78,8 +97,10 @@ app.get("/api/dryjuly", (req, res) => {
 });
 
 updateDryJulyData();
+
 setInterval(updateDryJulyData, 30000);
 
 app.listen(PORT, () => {
-  console.log(`Overlay running here: http://localhost:${PORT}/overlay.html`);
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Overlay: http://localhost:${PORT}/overlay.html`);
 });
