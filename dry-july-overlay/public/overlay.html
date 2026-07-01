@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body {
+    margin: 0;
+    background: transparent;
+    font-family: Arial, sans-serif;
+    color: white;
+  }
+
+  .box {
+    width: 560px;
+    padding: 26px;
+    border-radius: 26px;
+    background: rgba(0, 44, 79, 0.95);
+    border: 4px solid #00AEEF;
+    box-shadow: 0 0 28px rgba(0,174,239,0.8);
+  }
+
+  .header {
+    color: #FFD200;
+    font-size: 28px;
+    font-weight: 900;
+    margin-bottom: 18px;
+  }
+
+  .raised {
+    color: #FFD200;
+    font-size: 56px;
+    font-weight: 900;
+  }
+
+  .bar-bg {
+    height: 36px;
+    background: rgba(255,255,255,0.18);
+    border-radius: 999px;
+    overflow: hidden;
+    margin: 18px 0 10px;
+  }
+
+  .bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #00AEEF, #FFD200);
+    transition: width 1s ease;
+  }
+
+  .text {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+
+  .latest {
+    margin-top: 18px;
+    padding: 14px;
+    border-radius: 16px;
+    background: rgba(255,210,0,0.12);
+    border: 2px solid #FFD200;
+    font-size: 21px;
+  }
+
+  .donor-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    margin-top: 8px;
+  }
+
+  .small {
+    margin-top: 12px;
+    font-size: 15px;
+    opacity: 0.75;
+  }
+</style>
+</head>
+
+<body>
+  <div class="box">
+    <div class="header">💙 DRY JULY</div>
+
+    <div class="raised" id="raised">$0.00</div>
+
+    <div class="bar-bg">
+      <div class="bar-fill" id="bar"></div>
+    </div>
+
+    <div class="text" id="percent">0% Complete</div>
+    <div class="text">🎯 Goal: <span id="target">$150,000</span></div>
+    <div class="text">💛 Remaining: <span id="remaining">$0</span></div>
+
+    <div class="latest">
+      <strong style="color:#FFD200;">💛 Recent Donations</strong>
+      <div id="donorList">Loading...</div>
+    </div>
+
+    <div class="small" id="updated">Updating...</div>
+  </div>
+
+<script>
+async function loadData() {
+  const res = await fetch("/api/dryjuly");
+  const data = await res.json();
+
+  const raised = Number(data.raised || 0);
+  const target = 150000;
+  const percent = (raised / target) * 100;
+  const remaining = Math.max(target - raised, 0);
+
+  document.getElementById("raised").textContent =
+    "$" + raised.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  document.getElementById("target").textContent = "$150,000";
+
+  document.getElementById("remaining").textContent =
+    "$" + remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  document.getElementById("percent").textContent = percent.toFixed(2) + "% Complete";
+  document.getElementById("bar").style.width = Math.min(percent, 100) + "%";
+
+  const donorList = document.getElementById("donorList");
+
+  if (data.donations && data.donations.length > 0) {
+    donorList.innerHTML = data.donations.slice(0, 3).map(d => `
+      <div class="donor-row">
+        <span>${d.name}</span>
+        <strong>${d.amount}</strong>
+      </div>
+    `).join("");
+  } else {
+    donorList.innerHTML = `<div style="margin-top:8px;">No donations found yet</div>`;
+  }
+
+  document.getElementById("updated").textContent = "Updated: " + data.updated;
+}
+
+loadData();
+setInterval(loadData, 1000);
+</script>
+</body>
+</html>
